@@ -12,6 +12,15 @@ export function generateTerraformCode(elements) {
   bucket = "${el.id}-bucket"
   acl    = "private"
 }\n\n`;
+    } else if (el.id.startsWith("vpc")) {
+      code += `resource "aws_vpc" "${el.id}" {
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+  tags = {
+    Name = "${el.id}-vpc"
+  }
+}\n\n`;
     }
   });
 
