@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import ReactFlow, {
   ReactFlowProvider,
   addEdge,
@@ -17,6 +17,8 @@ const App = () => {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [code, setCode] = useState("");
+  const [selectedNodeId, setSelectedNodeId] = useState(null);
+  const [nodeConfigs, setNodeConfigs] = useState({});
 
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
@@ -39,16 +41,19 @@ const App = () => {
         id: `${type}-${+new Date()}`,
         type: "default",
         position,
+        selectable: true,
         data: {
           label: (
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-col items-center p-2 bg-white rounded-lg shadow border border-gray-300 w-32">
               <img
                 src={`/icons/${type}.png`}
                 alt={type}
-                className="w-5 h-5"
+                className="w-8 h-8 mb-1"
                 onError={(e) => (e.target.style.display = "none")}
               />
-              <span>{type.toUpperCase()}</span>
+              <span className="text-xs font-medium text-gray-700">
+                {type.toUpperCase()}
+              </span>
             </div>
           ),
         },
@@ -64,8 +69,20 @@ const App = () => {
     event.dataTransfer.dropEffect = "move";
   };
 
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Delete" || event.key === "Backspace") {
+        setNodes((nds) => nds.filter((node) => !node.selected));
+        setEdges((eds) => eds.filter((edge) => !edge.selected));
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [setNodes, setEdges]);
+
   const generateCode = () => {
-    const tfCode = generateTerraformCode(nodes);
+    const tfCode = generateTerraformCode(nodes, nodeConfigs);
     setCode(tfCode);
   };
 
@@ -95,6 +112,9 @@ const App = () => {
             onConnect={onConnect}
             onInit={setReactFlowInstance}
             fitView
+            snapToGrid={true}
+            snapGrid={[20, 20]}
+            onNodeClick={(_, node) => setSelectedNodeId(node.id)}
           >
             <MiniMap />
             <Controls />
@@ -117,8 +137,47 @@ const App = () => {
           </div>
         </div>
 
+        {/* Right-side panel: Editor + Generated Code */}
         <div className="w-1/3 p-4 bg-gray-100 overflow-auto">
-          <pre>{code}</pre>
+          {selectedNodeId ? (
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold mb-2">Edit Node</h2>
+
+              <input
+                className="w-full p-2 mb-2 border"
+                placeholder="Instance Type (e.g. t2.micro)"
+                value={nodeConfigs[selectedNodeId]?.instance_type || ""}
+                onChange={(e) =>
+                  setNodeConfigs((prev) => ({
+                    ...prev,
+                    [selectedNodeId]: {
+                      ...prev[selectedNodeId],
+                      instance_type: e.target.value,
+                    },
+                  }))
+                }
+              />
+
+              <input
+                className="w-full p-2 border"
+                placeholder="AMI ID (e.g. ami-12345678)"
+                value={nodeConfigs[selectedNodeId]?.ami || ""}
+                onChange={(e) =>
+                  setNodeConfigs((prev) => ({
+                    ...prev,
+                    [selectedNodeId]: {
+                      ...prev[selectedNodeId],
+                      ami: e.target.value,
+                    },
+                  }))
+                }
+              />
+            </div>
+          ) : (
+            <p className="text-gray-500">Select a node to edit properties</p>
+          )}
+
+          <pre className="text-sm whitespace-pre-wrap">{code}</pre>
         </div>
       </div>
     </ReactFlowProvider>
