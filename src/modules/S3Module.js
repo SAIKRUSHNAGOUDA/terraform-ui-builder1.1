@@ -1,8 +1,6 @@
-const S3Module = (id) => {
+export function generateS3(id, config) {
   return `resource "aws_s3_bucket" "${id}" {
   bucket = "${id}-bucket"
-  acl    = "private"
-}`;
-};
-
-export default S3Module;
+  acl    = "${config.acl || "private"}"
+}\n\n`;
+}
