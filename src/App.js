@@ -19,6 +19,10 @@ const App = () => {
   const [code, setCode] = useState("");
   const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [nodeConfigs, setNodeConfigs] = useState({});
+  const [tempConfig, setTempConfig] = useState({
+    instance_type: "",
+    ami: "",
+  });
 
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
@@ -69,17 +73,27 @@ const App = () => {
     event.dataTransfer.dropEffect = "move";
   };
 
-  useEffect(() => {
-    const handleKeyDown = (event) => {
-      if (event.key === "Delete" || event.key === "Backspace") {
-        setNodes((nds) => nds.filter((node) => !node.selected));
-        setEdges((eds) => eds.filter((edge) => !edge.selected));
-      }
+  const onNodeClick = (_, node) => {
+    setSelectedNodeId(node.id);
+    const current = nodeConfigs[node.id] || {};
+    setTempConfig({
+      instance_type: current.instance_type || "",
+      ami: current.ami || "",
+    });
+  };
+
+  const handleSave = () => {
+    if (!selectedNodeId) return;
+
+    const updatedConfigs = {
+      ...nodeConfigs,
+      [selectedNodeId]: tempConfig,
     };
 
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [setNodes, setEdges]);
+    setNodeConfigs(updatedConfigs);
+    const tfCode = generateTerraformCode(nodes, updatedConfigs); // ✅ live update
+    setCode(tfCode);
+  };
 
   const generateCode = () => {
     const tfCode = generateTerraformCode(nodes, nodeConfigs);
@@ -94,6 +108,19 @@ const App = () => {
     a.download = "main.tf";
     a.click();
   };
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Delete" || event.key === "Backspace") {
+        setNodes((nds) => nds.filter((node) => !node.selected));
+        setEdges((eds) => eds.filter((edge) => !edge.selected));
+        setSelectedNodeId(null);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [setNodes, setEdges]);
 
   return (
     <ReactFlowProvider>
@@ -114,7 +141,7 @@ const App = () => {
             fitView
             snapToGrid={true}
             snapGrid={[20, 20]}
-            onNodeClick={(_, node) => setSelectedNodeId(node.id)}
+            onNodeClick={onNodeClick}
           >
             <MiniMap />
             <Controls />
@@ -137,7 +164,6 @@ const App = () => {
           </div>
         </div>
 
-        {/* Right-side panel: Editor + Generated Code */}
         <div className="w-1/3 p-4 bg-gray-100 overflow-auto">
           {selectedNodeId ? (
             <div className="mb-4">
@@ -146,32 +172,33 @@ const App = () => {
               <input
                 className="w-full p-2 mb-2 border"
                 placeholder="Instance Type (e.g. t2.micro)"
-                value={nodeConfigs[selectedNodeId]?.instance_type || ""}
+                value={tempConfig.instance_type}
                 onChange={(e) =>
-                  setNodeConfigs((prev) => ({
+                  setTempConfig((prev) => ({
                     ...prev,
-                    [selectedNodeId]: {
-                      ...prev[selectedNodeId],
-                      instance_type: e.target.value,
-                    },
+                    instance_type: e.target.value,
                   }))
                 }
               />
 
               <input
-                className="w-full p-2 border"
+                className="w-full p-2 border mb-2"
                 placeholder="AMI ID (e.g. ami-12345678)"
-                value={nodeConfigs[selectedNodeId]?.ami || ""}
+                value={tempConfig.ami}
                 onChange={(e) =>
-                  setNodeConfigs((prev) => ({
+                  setTempConfig((prev) => ({
                     ...prev,
-                    [selectedNodeId]: {
-                      ...prev[selectedNodeId],
-                      ami: e.target.value,
-                    },
+                    ami: e.target.value,
                   }))
                 }
               />
+
+              <button
+                onClick={handleSave}
+                className="bg-blue-600 text-white px-4 py-2 rounded"
+              >
+                Save Changes
+              </button>
             </div>
           ) : (
             <p className="text-gray-500">Select a node to edit properties</p>
