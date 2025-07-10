@@ -12,6 +12,8 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import Sidebar from "./Sidebar";
 import { generateTerraformCode } from "./utils";
+import { moduleUIMap as ConfigComponents } from "./modules/ModuleConfigMap";
+
 
 const App = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -30,7 +32,6 @@ const App = () => {
     (event) => {
       event.preventDefault();
       const type = event.dataTransfer.getData("application/reactflow");
-
       if (!type || !reactFlowInstance) return;
 
       const position = reactFlowInstance.project({
@@ -38,28 +39,22 @@ const App = () => {
         y: event.clientY,
       });
 
-      const id = `${type}-${+new Date()}`;
-
       const newNode = {
-        id,
+        id: `${type}-${+new Date()}`,
         type: "default",
         position,
         data: {
           label: (
-            <div className="p-2 rounded-md shadow-md border bg-white flex items-center space-x-2">
+            <div className="flex items-center space-x-2">
               <img
                 src={`/icons/${type}.png`}
                 alt={type}
-                className="w-6 h-6"
+                className="w-5 h-5"
                 onError={(e) => (e.target.style.display = "none")}
               />
-              <span className="font-semibold">{type.toUpperCase()}</span>
+              <span>{type.toUpperCase()}</span>
             </div>
           ),
-        },
-        style: {
-          borderRadius: 12,
-          padding: 10,
         },
       };
 
@@ -71,21 +66,6 @@ const App = () => {
   const onDragOver = (event) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
-  };
-
-  const onNodeClick = (_event, node) => {
-    setSelectedNode(node);
-  };
-
-  const handleConfigChange = (e) => {
-    const { name, value } = e.target;
-    setConfigMap((prev) => ({
-      ...prev,
-      [selectedNode.id]: {
-        ...prev[selectedNode.id],
-        [name]: value,
-      },
-    }));
   };
 
   const generateCode = () => {
@@ -102,82 +82,27 @@ const App = () => {
     a.click();
   };
 
-  const renderConfigPanel = () => {
-    if (!selectedNode) return null;
-    const id = selectedNode.id;
-    const type = id.split("-")[0];
-    const config = configMap[id] || {};
+  const handleConfigChange = (e) => {
+    const { name, value } = e.target;
+    setConfigMap((prev) => ({
+      ...prev,
+      [selectedNode.id]: {
+        ...prev[selectedNode.id],
+        [name]: value,
+      },
+    }));
+  };
 
-    return (
-      <div className="p-4 border-l border-gray-300 bg-white h-full">
-        <h2 className="text-lg font-semibold mb-4">Edit {type.toUpperCase()} Config</h2>
-        {type === "ec2" && (
-          <>
-            <label className="block mb-2">
-              AMI:
-              <input
-                type="text"
-                name="ami"
-                value={config.ami || ""}
-                onChange={handleConfigChange}
-                className="w-full p-2 border rounded"
-              />
-            </label>
-            <label className="block mb-2">
-              Instance Type:
-              <input
-                type="text"
-                name="instance_type"
-                value={config.instance_type || ""}
-                onChange={handleConfigChange}
-                className="w-full p-2 border rounded"
-              />
-            </label>
-          </>
-        )}
-        {type === "s3" && (
-          <label className="block mb-2">
-            ACL:
-            <input
-              type="text"
-              name="acl"
-              value={config.acl || ""}
-              onChange={handleConfigChange}
-              className="w-full p-2 border rounded"
-            />
-          </label>
-        )}
-        {type === "vpc" && (
-          <label className="block mb-2">
-            CIDR Block:
-            <input
-              type="text"
-              name="cidr_block"
-              value={config.cidr_block || ""}
-              onChange={handleConfigChange}
-              className="w-full p-2 border rounded"
-            />
-          </label>
-        )}
-        <button
-          className="mt-4 bg-blue-500 text-white px-4 py-2 rounded"
-          onClick={() => setSelectedNode(null)}
-        >
-          Save Changes
-        </button>
-      </div>
-    );
+  const saveChanges = () => {
+    const tfCode = generateTerraformCode(nodes, configMap);
+    setCode(tfCode);
   };
 
   return (
     <ReactFlowProvider>
       <div className="flex h-screen">
         <Sidebar />
-        <div
-          className="flex-1 relative"
-          onDrop={onDrop}
-          onDragOver={onDragOver}
-        >
+        <div className="flex-1 relative" onDrop={onDrop} onDragOver={onDragOver}>
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -185,23 +110,18 @@ const App = () => {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onInit={setReactFlowInstance}
-            onNodeClick={onNodeClick}
+            onNodeClick={(event, node) => setSelectedNode(node)}
             fitView
           >
             <MiniMap />
-            <Controls showInteractive={true} />
-            <Background
-              variant="dots"
-              gap={20}
-              size={1}
-              color="#D3D3D3"
-            />
+            <Controls />
+            <Background />
           </ReactFlow>
 
-          <div className="absolute bottom-0 left-0 bg-white p-2 z-10 flex space-x-2">
+          <div className="absolute bottom-0 left-0 bg-white p-2 z-10">
             <button
               onClick={generateCode}
-              className="bg-blue-500 text-white px-4 py-2 rounded"
+              className="mr-2 bg-blue-500 text-white px-4 py-2 rounded"
             >
               Generate Code
             </button>
@@ -211,20 +131,37 @@ const App = () => {
             >
               Download TF
             </button>
-            <button
-              onClick={() => reactFlowInstance?.zoomTo(1)}
-              className="bg-gray-500 text-white px-4 py-2 rounded"
-            >
-              Reset Zoom
-            </button>
           </div>
         </div>
 
         <div className="w-1/3 p-4 bg-gray-100 overflow-auto">
+          <h2 className="text-lg font-bold mb-2">Terraform Code</h2>
           <pre>{code}</pre>
-        </div>
 
-        {renderConfigPanel()}
+          {selectedNode && (
+            <div className="mt-4">
+              <h3 className="text-md font-semibold mb-2">Edit Configuration</h3>
+              {(() => {
+                const type = selectedNode.id.split("-")[0];
+                const Component = ConfigComponents[type];
+                return Component ? (
+                  <Component
+                    config={configMap[selectedNode.id] || {}}
+                    onChange={handleConfigChange}
+                  />
+                ) : (
+                  <p className="text-sm text-red-500">No config UI for {type}</p>
+                );
+              })()}
+              <button
+                onClick={saveChanges}
+                className="bg-blue-600 text-white px-4 py-2 rounded mt-2"
+              >
+                Save Changes
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </ReactFlowProvider>
   );
