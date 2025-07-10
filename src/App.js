@@ -18,6 +18,8 @@ const App = () => {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [code, setCode] = useState("");
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [configMap, setConfigMap] = useState({});
 
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
@@ -36,8 +38,10 @@ const App = () => {
         y: event.clientY,
       });
 
+      const id = `${type}-${+new Date()}`;
+
       const newNode = {
-        id: `${type}-${+new Date()}`,
+        id,
         type: "default",
         position,
         data: {
@@ -69,8 +73,23 @@ const App = () => {
     event.dataTransfer.dropEffect = "move";
   };
 
+  const onNodeClick = (_event, node) => {
+    setSelectedNode(node);
+  };
+
+  const handleConfigChange = (e) => {
+    const { name, value } = e.target;
+    setConfigMap((prev) => ({
+      ...prev,
+      [selectedNode.id]: {
+        ...prev[selectedNode.id],
+        [name]: value,
+      },
+    }));
+  };
+
   const generateCode = () => {
-    const tfCode = generateTerraformCode(nodes);
+    const tfCode = generateTerraformCode(nodes, configMap);
     setCode(tfCode);
   };
 
@@ -81,6 +100,73 @@ const App = () => {
     a.href = url;
     a.download = "main.tf";
     a.click();
+  };
+
+  const renderConfigPanel = () => {
+    if (!selectedNode) return null;
+    const id = selectedNode.id;
+    const type = id.split("-")[0];
+    const config = configMap[id] || {};
+
+    return (
+      <div className="p-4 border-l border-gray-300 bg-white h-full">
+        <h2 className="text-lg font-semibold mb-4">Edit {type.toUpperCase()} Config</h2>
+        {type === "ec2" && (
+          <>
+            <label className="block mb-2">
+              AMI:
+              <input
+                type="text"
+                name="ami"
+                value={config.ami || ""}
+                onChange={handleConfigChange}
+                className="w-full p-2 border rounded"
+              />
+            </label>
+            <label className="block mb-2">
+              Instance Type:
+              <input
+                type="text"
+                name="instance_type"
+                value={config.instance_type || ""}
+                onChange={handleConfigChange}
+                className="w-full p-2 border rounded"
+              />
+            </label>
+          </>
+        )}
+        {type === "s3" && (
+          <label className="block mb-2">
+            ACL:
+            <input
+              type="text"
+              name="acl"
+              value={config.acl || ""}
+              onChange={handleConfigChange}
+              className="w-full p-2 border rounded"
+            />
+          </label>
+        )}
+        {type === "vpc" && (
+          <label className="block mb-2">
+            CIDR Block:
+            <input
+              type="text"
+              name="cidr_block"
+              value={config.cidr_block || ""}
+              onChange={handleConfigChange}
+              className="w-full p-2 border rounded"
+            />
+          </label>
+        )}
+        <button
+          className="mt-4 bg-blue-500 text-white px-4 py-2 rounded"
+          onClick={() => setSelectedNode(null)}
+        >
+          Save Changes
+        </button>
+      </div>
+    );
   };
 
   return (
@@ -99,6 +185,7 @@ const App = () => {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onInit={setReactFlowInstance}
+            onNodeClick={onNodeClick}
             fitView
           >
             <MiniMap />
@@ -136,6 +223,8 @@ const App = () => {
         <div className="w-1/3 p-4 bg-gray-100 overflow-auto">
           <pre>{code}</pre>
         </div>
+
+        {renderConfigPanel()}
       </div>
     </ReactFlowProvider>
   );
