@@ -1,41 +1,51 @@
-import { generateEC2 } from "./modules/EC2Module";
-import { generateS3 } from "./modules/S3Module";
-import { generateVPC } from "./modules/VPCModule";
+import { generateEC2 } from "./modules/aws/EC2Module";
+import { generateComputeInstance } from "./modules/gcp/ComputeEngineModule";
+import { generateAzureVM } from "./modules/azure/VMModule";
 
-// Placeholder for future cloud platform generators
-// import { generateAzureVM } from "./modules/AzureVMModule";
-// import { generateGCPInstance } from "./modules/GCPInstanceModule";
+export function generateTerraformCode(elements, configMap = {}, platform = "aws", region = "us-east-1") {
+  platform = platform.toLowerCase();
 
-export function generateTerraformCode(elements, configMap = {}) {
   let code = "";
+
+  // Add provider block based on selected platform
+  switch (platform) {
+    case "aws":
+      code += `provider "aws" {\n  region = "${region}"\n}\n\n`;
+      break;
+    case "gcp":
+      code += `provider "google" {\n  region = "${region}"\n}\n\n`;
+      break;
+    case "azure":
+      code += `provider "azurerm" {\n  features = {}\n  location = "${region}"\n}\n\n`;
+      break;
+    default:
+      code += `# Unsupported platform "${platform}"\n\n`;
+      break;
+  }
 
   elements.forEach((el) => {
     const config = configMap[el.id] || {};
-    const platform = config.platform || "aws"; // Default to AWS
+    const elPlatform = (config.platform || platform).toLowerCase();
+    const type = el.id.split("-")[0];
 
-    switch (platform) {
+    switch (elPlatform) {
       case "aws":
-        if (el.id.startsWith("ec2")) {
-          code += generateEC2(el.id, config);
-        } else if (el.id.startsWith("s3")) {
-          code += generateS3(el.id, config);
-        } else if (el.id.startsWith("vpc")) {
-          code += generateVPC(el.id, config);
-        }
-        break;
-
-      case "azure":
-        // Future Azure module support
-        code += `# Azure support for ${el.id} not implemented yet\n\n`;
+        if (type === "ec2") code += generateEC2(el.id, { ...config, region });
+        else code += `# Unsupported AWS resource type: ${type}\n\n`;
         break;
 
       case "gcp":
-        // Future GCP module support
-        code += `# GCP support for ${el.id} not implemented yet\n\n`;
+        if (type === "ec2") code += generateComputeInstance(el.id, { ...config, region });
+        else code += `# Unsupported GCP resource type: ${type}\n\n`;
+        break;
+
+      case "azure":
+        if (type === "ec2") code += generateAzureVM(el.id, { ...config, region });
+        else code += `# Unsupported Azure resource type: ${type}\n\n`;
         break;
 
       default:
-        code += `# Unsupported platform "${platform}" for ${el.id}\n\n`;
+        code += `# Unknown platform: ${elPlatform}\n\n`;
         break;
     }
   });
