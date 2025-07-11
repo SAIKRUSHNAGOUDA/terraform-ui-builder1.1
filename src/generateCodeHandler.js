@@ -15,7 +15,7 @@ export const generateTerraformCode = (nodes, configMap, platform, region) => {
         code += `provider "azurerm" {\n  features = {}\n}\n\n`;
         break;
       case "gcp":
-        code += `provider "google" {\n  region  = "${region}"\n  project = "your-gcp-project-id"\n}\n\n`; // Replace with actual project ID
+        code += `provider "google" {\n  region  = "${region}"\n  project = "your-gcp-project-id"\n}\n\n`; // Replace this
         break;
       default:
         code += `# Unsupported platform: ${p}\n\n`;
@@ -143,7 +143,6 @@ resource "google_compute_network" "${node.id}" {
 resource "aws_instance" "${node.id}" {
   ami           = "ami-123456"
   instance_type = "t2.micro"
-  region        = "${config.region}"
 }
 `;
         break;
