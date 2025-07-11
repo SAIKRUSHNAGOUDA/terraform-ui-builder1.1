@@ -12,8 +12,7 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import Sidebar from "./Sidebar";
 import { generateTerraformCode } from "./utils";
-import { moduleUIMap as ConfigComponents } from "./modules/ModuleConfigMap";
-
+import { ConfigComponents } from "./modules/ModuleConfigMap";
 
 const App = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -71,7 +70,7 @@ const App = () => {
   };
 
   const generateCode = () => {
-    const tfCode = generateTerraformCode(nodes, configMap);
+    const tfCode = generateTerraformCode(nodes, configMap, platform, region);
     setCode(tfCode);
   };
 
@@ -96,15 +95,32 @@ const App = () => {
   };
 
   const saveChanges = () => {
-    const tfCode = generateTerraformCode(nodes, configMap);
+    const tfCode = generateTerraformCode(nodes, configMap, platform, region);
     setCode(tfCode);
+  };
+
+  const handlePlatformChange = (e) => {
+    setPlatform(e.target.value);
+  };
+
+  const handleRegionChange = (e) => {
+    setRegion(e.target.value);
   };
 
   return (
     <ReactFlowProvider>
       <div className="flex h-screen">
-        <Sidebar />
-        <div className="flex-1 relative" onDrop={onDrop} onDragOver={onDragOver}>
+        <Sidebar
+          platform={platform}
+          region={region}
+          onPlatformChange={handlePlatformChange}
+          onRegionChange={handleRegionChange}
+        />
+        <div
+          className="flex-1 relative"
+          onDrop={onDrop}
+          onDragOver={onDragOver}
+        >
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -120,10 +136,10 @@ const App = () => {
             <Background />
           </ReactFlow>
 
-          <div className="absolute bottom-0 left-0 bg-white p-2 z-10">
+          <div className="absolute bottom-0 left-0 bg-white p-2 z-10 flex gap-2">
             <button
               onClick={generateCode}
-              className="mr-2 bg-blue-500 text-white px-4 py-2 rounded"
+              className="bg-blue-500 text-white px-4 py-2 rounded"
             >
               Generate Code
             </button>
@@ -132,6 +148,12 @@ const App = () => {
               className="bg-green-500 text-white px-4 py-2 rounded"
             >
               Download TF
+            </button>
+            <button
+              onClick={() => window.history.back()}
+              className="bg-gray-500 text-white px-4 py-2 rounded"
+            >
+              Back
             </button>
           </div>
         </div>
@@ -143,6 +165,7 @@ const App = () => {
           {selectedNode && (
             <div className="mt-4">
               <h3 className="text-md font-semibold mb-2">Edit Configuration</h3>
+
               {(() => {
                 const type = selectedNode.id.split("-")[0];
                 const Component = ConfigComponents[type];
@@ -151,10 +174,9 @@ const App = () => {
                     config={configMap[selectedNode.id] || {}}
                     onChange={handleConfigChange}
                   />
-                ) : (
-                  <p className="text-sm text-red-500">No config UI for {type}</p>
-                );
+                ) : null;
               })()}
+
               <button
                 onClick={saveChanges}
                 className="bg-blue-600 text-white px-4 py-2 rounded mt-2"
