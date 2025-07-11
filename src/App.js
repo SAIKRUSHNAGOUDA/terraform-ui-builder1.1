@@ -32,15 +32,16 @@ const App = () => {
   const onDrop = useCallback(
     (event) => {
       event.preventDefault();
-      const type = event.dataTransfer.getData("application/reactflow");
+      const type = event.dataTransfer.getData("application/reactflow"); // like 'ec2', 's3', etc.
       if (!type || !reactFlowInstance) return;
 
+      const fullType = `${platform.toLowerCase()}-${type}`;
+      const id = `${fullType}-${+new Date()}`;
       const position = reactFlowInstance.project({
         x: event.clientX,
         y: event.clientY,
       });
 
-      const id = `${type}-${+new Date()}`;
       const newNode = {
         id,
         type: "default",
@@ -62,7 +63,7 @@ const App = () => {
 
       setNodes((nds) => nds.concat(newNode));
 
-      // Set default config for new node
+      // Default config
       setConfigMap((prev) => ({
         ...prev,
         [id]: {
@@ -116,6 +117,7 @@ const App = () => {
   return (
     <ReactFlowProvider>
       <div className="flex h-screen">
+        {/* Sidebar */}
         <div className="w-64 bg-gray-200 p-4">
           <Sidebar
             platform={platform}
@@ -123,32 +125,9 @@ const App = () => {
             onPlatformChange={(e) => setPlatform(e.target.value)}
             onRegionChange={(e) => setRegion(e.target.value)}
           />
-          <div className="mt-4">
-            <label className="block text-sm font-medium mb-1">Platform</label>
-            <select
-              className="w-full p-2 border rounded"
-              value={platform}
-              onChange={(e) => setPlatform(e.target.value)}
-            >
-              <option value="AWS">AWS</option>
-              <option value="GCP">GCP</option>
-            </select>
-          </div>
-          <div className="mt-2">
-            <label className="block text-sm font-medium mb-1">Region</label>
-            <select
-              className="w-full p-2 border rounded"
-              value={region}
-              onChange={(e) => setRegion(e.target.value)}
-            >
-              <option value="us-east-1">US East (N. Virginia)</option>
-              <option value="us-west-1">US West (N. California)</option>
-              <option value="us-central1">GCP - US Central (Iowa)</option>
-              <option value="europe-west1">GCP - Europe (Belgium)</option>
-            </select>
-          </div>
         </div>
 
+        {/* Canvas */}
         <div
           className="flex-1 relative"
           onDrop={onDrop}
@@ -191,6 +170,7 @@ const App = () => {
           </div>
         </div>
 
+        {/* Terraform + Config */}
         <div className="w-1/3 p-4 bg-gray-100 overflow-auto">
           <h2 className="text-lg font-bold mb-2">Terraform Code</h2>
           <pre>{code}</pre>
@@ -198,18 +178,18 @@ const App = () => {
           {selectedNode && (
             <div className="mt-4">
               <h3 className="text-md font-semibold mb-2">Edit Configuration</h3>
-
               {(() => {
-                const type = selectedNode.id.split("-")[0];
+                const type = selectedNode.id.split("-").slice(0, 2).join("-"); // e.g., aws-ec2
                 const Component = moduleUIMap[type];
                 return Component ? (
                   <Component
                     config={configMap[selectedNode.id] || {}}
                     onChange={handleConfigChange}
                   />
-                ) : null;
+                ) : (
+                  <p className="text-sm text-red-500">No config UI for {type}</p>
+                );
               })()}
-
               <button
                 onClick={saveChanges}
                 className="bg-blue-600 text-white px-4 py-2 rounded mt-2"
