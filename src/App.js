@@ -1,5 +1,4 @@
-// App.js
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import ReactFlow, {
   ReactFlowProvider,
   addEdge,
@@ -11,17 +10,15 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 import Sidebar from "./Sidebar";
-import { generateTerraformCode } from "./utils";
-import { moduleUIMap } from "./modules/ModuleConfigMap";
+import { generateTerraformCode } from "./generateCodeHandler";
 
 const App = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [code, setCode] = useState("");
-  const [selectedNode, setSelectedNode] = useState(null);
   const [configMap, setConfigMap] = useState({});
-  const [platform, setPlatform] = useState("AWS");
+  const [platform, setPlatform] = useState("aws");
   const [region, setRegion] = useState("us-east-1");
 
   const onConnect = useCallback(
@@ -32,11 +29,11 @@ const App = () => {
   const onDrop = useCallback(
     (event) => {
       event.preventDefault();
-      const type = event.dataTransfer.getData("application/reactflow"); // like 'ec2', 's3', etc.
-      if (!type || !reactFlowInstance) return;
+      const fullType = event.dataTransfer.getData("application/reactflow"); // e.g., "azure-vm"
+      if (!fullType || !reactFlowInstance) return;
 
-      const fullType = `${platform.toLowerCase()}-${type}`;
-      const id = `${fullType}-${+new Date()}`;
+      const [platformFromDrag, typeFromDrag] = fullType.split("-");
+      const id = `${fullType}-${Date.now()}`;
       const position = reactFlowInstance.project({
         x: event.clientX,
         y: event.clientY,
@@ -50,29 +47,27 @@ const App = () => {
           label: (
             <div className="flex items-center space-x-2">
               <img
-                src={`/icons/${type}.png`}
-                alt={type}
+                src={`/icons/${typeFromDrag}.png`}
+                alt={typeFromDrag}
                 className="w-5 h-5"
                 onError={(e) => (e.target.style.display = "none")}
               />
-              <span>{type.toUpperCase()}</span>
+              <span>{typeFromDrag.toUpperCase()}</span>
             </div>
           ),
         },
       };
 
       setNodes((nds) => nds.concat(newNode));
-
-      // Default config
       setConfigMap((prev) => ({
         ...prev,
         [id]: {
-          platform: platform.toLowerCase(),
+          platform: platformFromDrag.toLowerCase(),
           region,
         },
       }));
     },
-    [reactFlowInstance, platform, region]
+    [reactFlowInstance, region]
   );
 
   const onDragOver = (event) => {
@@ -81,7 +76,11 @@ const App = () => {
   };
 
   const generateCode = () => {
-    const tfCode = generateTerraformCode(nodes, configMap, platform.toLowerCase(), region);
+    if (nodes.length === 0) {
+      setCode("");
+      return;
+    }
+    const tfCode = generateTerraformCode(nodes, configMap, platform, region);
     setCode(tfCode);
   };
 
@@ -94,40 +93,18 @@ const App = () => {
     a.click();
   };
 
-  const handleConfigChange = (e) => {
-    const { name, value } = e.target;
-    setConfigMap((prev) => ({
-      ...prev,
-      [selectedNode.id]: {
-        ...prev[selectedNode.id],
-        [name]: value,
-      },
-    }));
-  };
-
-  const saveChanges = () => {
-    const tfCode = generateTerraformCode(nodes, configMap, platform.toLowerCase(), region);
-    setCode(tfCode);
-  };
-
-  const handleBack = () => {
-    window.history.back();
-  };
-
   return (
     <ReactFlowProvider>
       <div className="flex h-screen">
-        {/* Sidebar */}
         <div className="w-64 bg-gray-200 p-4">
           <Sidebar
             platform={platform}
             region={region}
-            onPlatformChange={(e) => setPlatform(e.target.value)}
+            onPlatformChange={setPlatform}
             onRegionChange={(e) => setRegion(e.target.value)}
           />
         </div>
 
-        {/* Canvas */}
         <div
           className="flex-1 relative"
           onDrop={onDrop}
@@ -140,7 +117,6 @@ const App = () => {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onInit={setReactFlowInstance}
-            onNodeClick={(event, node) => setSelectedNode(node)}
             fitView
           >
             <MiniMap />
@@ -161,43 +137,12 @@ const App = () => {
             >
               Download TF
             </button>
-            <button
-              onClick={handleBack}
-              className="bg-gray-500 text-white px-4 py-2 rounded"
-            >
-              Back
-            </button>
           </div>
         </div>
 
-        {/* Terraform + Config */}
         <div className="w-1/3 p-4 bg-gray-100 overflow-auto">
           <h2 className="text-lg font-bold mb-2">Terraform Code</h2>
           <pre>{code}</pre>
-
-          {selectedNode && (
-            <div className="mt-4">
-              <h3 className="text-md font-semibold mb-2">Edit Configuration</h3>
-              {(() => {
-                const type = selectedNode.id.split("-").slice(0, 2).join("-"); // e.g., aws-ec2
-                const Component = moduleUIMap[type];
-                return Component ? (
-                  <Component
-                    config={configMap[selectedNode.id] || {}}
-                    onChange={handleConfigChange}
-                  />
-                ) : (
-                  <p className="text-sm text-red-500">No config UI for {type}</p>
-                );
-              })()}
-              <button
-                onClick={saveChanges}
-                className="bg-blue-600 text-white px-4 py-2 rounded mt-2"
-              >
-                Save Changes
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </ReactFlowProvider>
