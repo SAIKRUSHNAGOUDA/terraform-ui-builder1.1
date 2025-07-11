@@ -22,6 +22,8 @@ const App = () => {
   const [code, setCode] = useState("");
   const [selectedNode, setSelectedNode] = useState(null);
   const [configMap, setConfigMap] = useState({});
+  const [platform, setPlatform] = useState("aws");
+  const [region, setRegion] = useState("us-east-1");
 
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
