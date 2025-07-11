@@ -12,7 +12,7 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import Sidebar from "./Sidebar";
 import { generateTerraformCode } from "./utils";
-import { ConfigComponents } from "./modules/ModuleConfigMap";
+import { moduleUIMap } from "./modules/ModuleConfigMap";
 
 const App = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -21,7 +21,7 @@ const App = () => {
   const [code, setCode] = useState("");
   const [selectedNode, setSelectedNode] = useState(null);
   const [configMap, setConfigMap] = useState({});
-  const [platform, setPlatform] = useState("aws");
+  const [platform, setPlatform] = useState("AWS");
   const [region, setRegion] = useState("us-east-1");
 
   const onConnect = useCallback(
@@ -40,8 +40,9 @@ const App = () => {
         y: event.clientY,
       });
 
+      const id = `${type}-${+new Date()}`;
       const newNode = {
-        id: `${type}-${+new Date()}`,
+        id,
         type: "default",
         position,
         data: {
@@ -60,8 +61,17 @@ const App = () => {
       };
 
       setNodes((nds) => nds.concat(newNode));
+
+      // Set default config for new node
+      setConfigMap((prev) => ({
+        ...prev,
+        [id]: {
+          platform: platform.toLowerCase(),
+          region,
+        },
+      }));
     },
-    [reactFlowInstance, setNodes]
+    [reactFlowInstance, platform, region]
   );
 
   const onDragOver = (event) => {
@@ -70,7 +80,7 @@ const App = () => {
   };
 
   const generateCode = () => {
-    const tfCode = generateTerraformCode(nodes, configMap, platform, region);
+    const tfCode = generateTerraformCode(nodes, configMap, platform.toLowerCase(), region);
     setCode(tfCode);
   };
 
@@ -95,27 +105,50 @@ const App = () => {
   };
 
   const saveChanges = () => {
-    const tfCode = generateTerraformCode(nodes, configMap, platform, region);
+    const tfCode = generateTerraformCode(nodes, configMap, platform.toLowerCase(), region);
     setCode(tfCode);
   };
 
-  const handlePlatformChange = (e) => {
-    setPlatform(e.target.value);
-  };
-
-  const handleRegionChange = (e) => {
-    setRegion(e.target.value);
+  const handleBack = () => {
+    window.history.back();
   };
 
   return (
     <ReactFlowProvider>
       <div className="flex h-screen">
-        <Sidebar
-          platform={platform}
-          region={region}
-          onPlatformChange={handlePlatformChange}
-          onRegionChange={handleRegionChange}
-        />
+        <div className="w-64 bg-gray-200 p-4">
+          <Sidebar
+            platform={platform}
+            region={region}
+            onPlatformChange={(e) => setPlatform(e.target.value)}
+            onRegionChange={(e) => setRegion(e.target.value)}
+          />
+          <div className="mt-4">
+            <label className="block text-sm font-medium mb-1">Platform</label>
+            <select
+              className="w-full p-2 border rounded"
+              value={platform}
+              onChange={(e) => setPlatform(e.target.value)}
+            >
+              <option value="AWS">AWS</option>
+              <option value="GCP">GCP</option>
+            </select>
+          </div>
+          <div className="mt-2">
+            <label className="block text-sm font-medium mb-1">Region</label>
+            <select
+              className="w-full p-2 border rounded"
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+            >
+              <option value="us-east-1">US East (N. Virginia)</option>
+              <option value="us-west-1">US West (N. California)</option>
+              <option value="us-central1">GCP - US Central (Iowa)</option>
+              <option value="europe-west1">GCP - Europe (Belgium)</option>
+            </select>
+          </div>
+        </div>
+
         <div
           className="flex-1 relative"
           onDrop={onDrop}
@@ -150,7 +183,7 @@ const App = () => {
               Download TF
             </button>
             <button
-              onClick={() => window.history.back()}
+              onClick={handleBack}
               className="bg-gray-500 text-white px-4 py-2 rounded"
             >
               Back
@@ -168,7 +201,7 @@ const App = () => {
 
               {(() => {
                 const type = selectedNode.id.split("-")[0];
-                const Component = ConfigComponents[type];
+                const Component = moduleUIMap[type];
                 return Component ? (
                   <Component
                     config={configMap[selectedNode.id] || {}}
