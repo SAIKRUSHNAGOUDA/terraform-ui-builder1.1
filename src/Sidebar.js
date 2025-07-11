@@ -1,14 +1,43 @@
 // Sidebar.js
 import React from "react";
 
-const Sidebar = () => {
+const Sidebar = ({ platform, region, onPlatformChange, onRegionChange }) => {
   const handleDragStart = (event, nodeType) => {
     event.dataTransfer.setData("application/reactflow", nodeType);
     event.dataTransfer.effectAllowed = "move";
   };
 
   return (
-    <aside className="w-48 bg-gray-200 p-4">
+    <aside className="w-60 bg-gray-200 p-4">
+      <h2 className="text-lg font-bold mb-4">Settings</h2>
+
+      <div className="mb-4">
+        <label className="block text-sm font-medium mb-1">Platform</label>
+        <select
+          value={platform}
+          onChange={(e) => onPlatformChange(e.target.value)}
+          className="w-full p-2 border rounded"
+        >
+          <option value="aws">AWS</option>
+          <option value="azure">Azure</option>
+          <option value="gcp">GCP</option>
+        </select>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-medium mb-1">Region</label>
+        <select
+          value={region}
+          onChange={(e) => onRegionChange(e.target.value)}
+          className="w-full p-2 border rounded"
+        >
+          <option value="us-east-1">US East (N. Virginia)</option>
+          <option value="us-west-1">US West (N. California)</option>
+          <option value="eu-west-1">EU (Ireland)</option>
+          <option value="ap-south-1">Asia Pacific (Mumbai)</option>
+        </select>
+      </div>
+
       <h2 className="text-lg font-bold mb-4">Components</h2>
 
       <div
