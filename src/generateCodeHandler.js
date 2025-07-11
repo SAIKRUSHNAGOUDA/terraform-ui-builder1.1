@@ -1,7 +1,6 @@
 export const generateTerraformCode = (nodes, configMap, platform, region) => {
   let code = "";
 
-  // Detect platforms used
   const platformsUsed = new Set(
     nodes.map((node) => configMap[node.id]?.platform || platform)
   );
@@ -15,7 +14,7 @@ export const generateTerraformCode = (nodes, configMap, platform, region) => {
         code += `provider "azurerm" {\n  features = {}\n}\n\n`;
         break;
       case "gcp":
-        code += `provider "google" {\n  region  = "${region}"\n  project = "your-gcp-project-id"\n}\n\n`; // Replace this
+        code += `provider "google" {\n  region  = "${region}"\n  project = "your-gcp-project-id"\n}\n\n`;
         break;
       default:
         code += `# Unsupported platform: ${p}\n\n`;
@@ -31,6 +30,7 @@ export const generateTerraformCode = (nodes, configMap, platform, region) => {
     }
 
     switch (type) {
+      // ----- Azure -----
       case "azure-vm":
         code += `
 resource "azurerm_virtual_network" "${node.id}_vnet" {
@@ -60,11 +60,11 @@ resource "azurerm_network_interface" "${node.id}_nic" {
 }
 
 resource "azurerm_linux_virtual_machine" "${node.id}" {
-  name                = "my-vm"
-  location            = "${config.region}"
-  resource_group_name = "my-group"
-  vm_size             = "Standard_B1s"
-  admin_username      = "adminuser"
+  name                  = "my-vm"
+  location              = "${config.region}"
+  resource_group_name   = "my-group"
+  vm_size               = "Standard_B1s"
+  admin_username        = "adminuser"
 
   network_interface_ids = [
     azurerm_network_interface.${node.id}_nic.id
@@ -98,6 +98,7 @@ resource "azurerm_storage_account" "${node.id}" {
 `;
         break;
 
+      // ----- GCP -----
       case "gcp-compute":
         code += `
 resource "google_compute_instance" "${node.id}" {
@@ -138,6 +139,7 @@ resource "google_compute_network" "${node.id}" {
 `;
         break;
 
+      // ----- AWS -----
       case "aws-ec2":
         code += `
 resource "aws_instance" "${node.id}" {
@@ -166,6 +168,7 @@ resource "aws_vpc" "${node.id}" {
 `;
         break;
 
+      // ----- Default -----
       default:
         code += `# Unsupported resource type: ${type}\n\n`;
     }
