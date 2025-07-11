@@ -11,6 +11,55 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import Sidebar from "./Sidebar";
 import { generateTerraformCode } from "./generateCodeHandler";
+import { REGION_OPTIONS } from "./regionMap";
+
+const ConfigEditor = ({ nodeId, configMap, setConfigMap, onSave }) => {
+  const [localConfig, setLocalConfig] = useState({});
+
+  useEffect(() => {
+    if (nodeId && configMap[nodeId]) {
+      setLocalConfig(configMap[nodeId]);
+    }
+  }, [nodeId, configMap]);
+
+  const handleChange = (key, value) => {
+    setLocalConfig((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleSave = () => {
+    setConfigMap((prev) => ({
+      ...prev,
+      [nodeId]: localConfig,
+    }));
+    if (onSave) onSave();
+  };
+
+  if (!nodeId || !configMap[nodeId]) {
+    return <p className="text-sm text-gray-500 italic">No node selected</p>;
+  }
+
+  return (
+    <div>
+      {Object.entries(localConfig).map(([key, value]) => (
+        <div key={key} className="mb-2">
+          <label className="block text-sm font-medium mb-1">{key}</label>
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => handleChange(key, e.target.value)}
+            className="w-full border px-2 py-1 rounded"
+          />
+        </div>
+      ))}
+      <button
+        onClick={handleSave}
+        className="mt-2 bg-blue-500 text-white px-4 py-1 rounded"
+      >
+        Save
+      </button>
+    </div>
+  );
+};
 
 const App = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -19,7 +68,14 @@ const App = () => {
   const [code, setCode] = useState("");
   const [configMap, setConfigMap] = useState({});
   const [platform, setPlatform] = useState("aws");
-  const [region, setRegion] = useState("us-east-1");
+  const [region, setRegion] = useState(REGION_OPTIONS["aws"][0].value);
+  const [selectedNodeId, setSelectedNodeId] = useState(null);
+
+  const handlePlatformChange = (newPlatform) => {
+    setPlatform(newPlatform);
+    const defaultRegion = REGION_OPTIONS[newPlatform]?.[0]?.value || "";
+    setRegion(defaultRegion);
+  };
 
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
@@ -29,7 +85,7 @@ const App = () => {
   const onDrop = useCallback(
     (event) => {
       event.preventDefault();
-      const fullType = event.dataTransfer.getData("application/reactflow"); // e.g., "azure-vm"
+      const fullType = event.dataTransfer.getData("application/reactflow");
       if (!fullType || !reactFlowInstance) return;
 
       const [platformFromDrag, typeFromDrag] = fullType.split("-");
@@ -64,6 +120,9 @@ const App = () => {
         [id]: {
           platform: platformFromDrag.toLowerCase(),
           region,
+          instance_type: "t2.micro",
+          ami: "ami-12345678",
+          name: typeFromDrag.toLowerCase(),
         },
       }));
     },
@@ -75,14 +134,22 @@ const App = () => {
     event.dataTransfer.dropEffect = "move";
   };
 
-  const generateCode = () => {
+  const onNodeClick = (event, node) => {
+    setSelectedNodeId(node.id);
+  };
+
+  const generateCode = useCallback(() => {
     if (nodes.length === 0) {
       setCode("");
       return;
     }
     const tfCode = generateTerraformCode(nodes, configMap, platform, region);
     setCode(tfCode);
-  };
+  }, [nodes, configMap, platform, region]);
+
+  useEffect(() => {
+    generateCode();
+  }, [configMap, generateCode]);
 
   const downloadCode = () => {
     const blob = new Blob([code], { type: "text/plain;charset=utf-8" });
@@ -100,7 +167,7 @@ const App = () => {
           <Sidebar
             platform={platform}
             region={region}
-            onPlatformChange={setPlatform}
+            onPlatformChange={handlePlatformChange}
             onRegionChange={(e) => setRegion(e.target.value)}
           />
         </div>
@@ -117,6 +184,7 @@ const App = () => {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onInit={setReactFlowInstance}
+            onNodeClick={onNodeClick}
             fitView
           >
             <MiniMap />
@@ -141,8 +209,22 @@ const App = () => {
         </div>
 
         <div className="w-1/3 p-4 bg-gray-100 overflow-auto">
-          <h2 className="text-lg font-bold mb-2">Terraform Code</h2>
-          <pre>{code}</pre>
+          {selectedNodeId && configMap[selectedNodeId] ? (
+            <>
+              <h2 className="text-lg font-bold mb-2">Edit Node Properties</h2>
+              <ConfigEditor
+                nodeId={selectedNodeId}
+                configMap={configMap}
+                setConfigMap={setConfigMap}
+                onSave={generateCode}
+              />
+            </>
+          ) : (
+            <p className="text-sm text-gray-500 italic">Click a node to edit its properties</p>
+          )}
+
+          <h2 className="text-lg font-bold mt-6 mb-2">Terraform Code</h2>
+          <pre className="text-sm bg-white p-2 rounded max-h-60 overflow-auto">{code}</pre>
         </div>
       </div>
     </ReactFlowProvider>
