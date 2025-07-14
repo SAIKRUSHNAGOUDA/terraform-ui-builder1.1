@@ -13,7 +13,7 @@ import Sidebar from "./Sidebar";
 import { generateTerraformCode } from "./generateCodeHandler";
 import { REGION_OPTIONS } from "./regionMap";
 
-const ConfigEditor = ({ nodeId, configMap, setConfigMap, onSave }) => {
+const ConfigEditor = ({ nodeId, configMap, setConfigMap, onClose, onSave }) => {
   const [localConfig, setLocalConfig] = useState({});
 
   useEffect(() => {
@@ -51,18 +51,26 @@ const ConfigEditor = ({ nodeId, configMap, setConfigMap, onSave }) => {
           />
         </div>
       ))}
-      <button
-        onClick={handleSave}
-        className="mt-2 bg-blue-500 text-white px-4 py-1 rounded"
-      >
-        Save
-      </button>
+      <div className="mt-2">
+        <button
+          onClick={handleSave}
+          className="bg-blue-500 text-white px-4 py-1 rounded"
+        >
+          Save
+        </button>
+        <button
+          onClick={onClose}
+          className="ml-2 bg-gray-400 text-white px-4 py-1 rounded"
+        >
+          Back
+        </button>
+      </div>
     </div>
   );
 };
 
 const App = () => {
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [nodes, setNodes, onNodesChangeRaw] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [code, setCode] = useState("");
@@ -138,6 +146,23 @@ const App = () => {
     setSelectedNodeId(node.id);
   };
 
+  const onNodesChange = useCallback(
+    (changes) => {
+      onNodesChangeRaw(changes);
+      const deletedNodes = changes
+        .filter((change) => change.type === "remove")
+        .map((change) => change.id);
+      if (deletedNodes.length > 0) {
+        setConfigMap((prev) => {
+          const updated = { ...prev };
+          deletedNodes.forEach((id) => delete updated[id]);
+          return updated;
+        });
+      }
+    },
+    [onNodesChangeRaw]
+  );
+
   const generateCode = useCallback(() => {
     if (nodes.length === 0) {
       setCode("");
@@ -149,7 +174,7 @@ const App = () => {
 
   useEffect(() => {
     generateCode();
-  }, [configMap, generateCode]);
+  }, [configMap, nodes]);
 
   const downloadCode = () => {
     const blob = new Blob([code], { type: "text/plain;charset=utf-8" });
